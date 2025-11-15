@@ -1763,7 +1763,7 @@ function renderTasksPage() {
             const project = projects.find(p => p.landowner === task.landowner);
             return `
                 <div class_id="team-task-item" class="list-item-card grid grid-cols-10 gap-4 items-center px-4 py-3 border-b ${project ? 'cursor-pointer' : ''}" ${project ? `onclick="navigateToProject(${project.id})"` : ''}>
-                    <div class="col-span-3 font-semibold text-gray-800">${task.name} ${task.landowner}</div>
+                    <div class="col-span-3 font-semibold text-gray-800">${task.name}</div>
                     <div class="col-span-3 text-sm text-gray-600">${task.landowner}</div>
                     <div class="col-span-2 text-sm text-gray-600">${task.due}</div>
                     <div class="col-span-2">
@@ -2046,45 +2046,39 @@ function updateSettingsView(view) {
 
 
 // --- MODAL FUNCTIONS ---
-function openCommunicationModal(filterType) {
+
+// *** NEW COMMUNICATION MODAL ***
+function openCommunicationModal() {
     const modal = document.getElementById('communication-modal');
-    let options = [];
-    let filterLabel = '';
     
-    // Logic to dynamically set filter options
-    switch (filterType) {
-        case 'county':
-            filterLabel = 'County';
-            const counties = [...new Set(projects.map(p => p.county))];
-            options = counties.map(c => `<option value="${c}">${c}</option>`);
-            break;
-        case 'actionType':
-            filterLabel = 'Action Type';
-            const actionTypes = [...new Set(projects.map(p => p.actionType))];
-            options = actionTypes.map(a => `<option value="${a}">${a}</option>`);
-            break;
-        case 'advisor':
-            filterLabel = 'Farm Advisor';
-            options = teamMembers.map(t => `<option value="${t.name}">${t.name}</option>`);
-            break;
-        case 'habitat':
-            filterLabel = 'Habitat Type';
-            const habitats = [...new Set(projects.flatMap(p => p.habitats.map(h => h.name)))];
-            options = habitats.map(h => `<option value="${h}">${h}</option>`);
-            break;
-        case 'payment':
-            filterLabel = 'Payment Status';
-            options = ['Paid', 'Authorisation', 'Pending'].map(s => `<option value="${s}">${s}</option>`);
-            break;
-        case 'actionStatus':
-            filterLabel = 'Action Status';
-            options = ['Authorised', 'Completed', 'Paid'].map(s => `<option value="${s}">${s}</option>`);
-            break;
-        default:
-            filterLabel = 'County';
-            const allCounties = [...new Set(projects.map(p => p.county))];
-            options = allCounties.map(c => `<option value="${c}">${c}</option>`);
-    }
+    // Define all filter options
+    const filterGroups = {
+        'county': {
+            label: 'County',
+            options: [...new Set(projects.map(p => p.county))]
+        },
+        'advisor': {
+            label: 'Farm Advisor',
+            options: teamMembers.map(t => t.name)
+        },
+        'habitat': {
+            label: 'Habitat Type',
+            options: [...new Set(projects.flatMap(p => p.habitats.map(h => h.name)))]
+        },
+        'paymentStatus': {
+            label: 'Payment Status',
+            options: ['Paid', 'Authorisation', 'Pending']
+        },
+        'actionStatus': {
+            label: 'Action Status',
+            options: ['Authorised', 'Completed', 'Paid']
+        }
+    };
+
+    // Build the primary filter dropdown
+    const filterTypeOptions = Object.keys(filterGroups).map(key => 
+        `<option value="${key}">${filterGroups[key].label}</option>`
+    ).join('');
 
     modal.innerHTML = `
         <div class="bg-white rounded-lg shadow-2xl w-full max-w-2xl p-8 m-4">
@@ -2103,12 +2097,16 @@ function openCommunicationModal(filterType) {
                         </div>
                     </div>
                     <div>
-                        <label for="comm-filter" class="block text-sm font-medium text-gray-700">Target Landowners By ${filterLabel}</label>
-                        <select id="comm-filter" class="mt-1 block w-full px-3 py-2 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500">
-                            <option value="all">All ${filterLabel}s</option>
-                            ${options.join('')}
-                        </select>
+                         <label for="comm-filter-type" class="block text-sm font-medium text-gray-700">Filter Target By</label>
+                         <select id="comm-filter-type" class="mt-1 block w-full px-3 py-2 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500">
+                            ${filterTypeOptions}
+                         </select>
                     </div>
+                </div>
+                <div class="mt-6">
+                    <label for="comm-filter-value" class="block text-sm font-medium text-gray-700">Select Value</label>
+                    <select id="comm-filter-value" class="mt-1 block w-full px-3 py-2 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500">
+                        </select>
                 </div>
                 <div class="mt-6">
                     <label for="comm-message" class="block text-sm font-medium text-gray-700">Message</label>
@@ -2123,6 +2121,25 @@ function openCommunicationModal(filterType) {
     `;
     modal.classList.add('flex');
     modal.classList.remove('hidden');
+
+    // --- New Dynamic Filter Logic ---
+    const filterTypeSelect = modal.querySelector('#comm-filter-type');
+    const filterValueSelect = modal.querySelector('#comm-filter-value');
+    
+    const updateCommFilterOptions = (selectedType) => {
+        const { label, options } = filterGroups[selectedType];
+        filterValueSelect.innerHTML = `<option value="all">All ${label}s</option>` + 
+                                      options.map(opt => `<option value="${opt}">${opt}</option>`).join('');
+    };
+
+    filterTypeSelect.addEventListener('change', (e) => {
+        updateCommFilterOptions(e.target.value);
+    });
+    
+    // Initial population (default to 'county')
+    updateCommFilterOptions('county');
+    // --- End of New Logic ---
+
     // Add event listeners for the channel switcher
     const emailBtn = modal.querySelector('#comm-channel-email');
     const whatsappBtn = modal.querySelector('#comm-channel-whatsapp');
@@ -2136,6 +2153,7 @@ function openCommunicationModal(filterType) {
     });
     document.getElementById('communication-form').onsubmit = handleSendMessage;
 }
+
 
 function openNewProjectModal() {
     const modal = document.getElementById('new-project-modal');
@@ -2344,7 +2362,8 @@ function handleSendMessage(e) {
     e.preventDefault();
     // In a real app, this would trigger a backend process
     console.log('Sending message:', {
-        filter: document.getElementById('comm-filter').value,
+        filter: document.getElementById('comm-filter-type').value,
+        value: document.getElementById('comm-filter-value').value,
         message: document.getElementById('comm-message').value,
     });
     closeModal('communication-modal');
@@ -2599,8 +2618,8 @@ contentArea.addEventListener('click', (e) => {
 // Communication sidebar links
 communicationLink.addEventListener('click', (e) => {
     e.preventDefault();
-    // Defaults to 'county' filter, can be changed to a general comms page
-    openCommunicationModal('county');
+    // NOW OPENS THE NEW, DYNAMIC MODAL
+    openCommunicationModal();
 });
 
 // Team Members sidebar links
